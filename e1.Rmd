@@ -1,0 +1,56 @@
+---
+title: "Exercise 2"
+author: "Tobias Raidl, 11717659"
+date: "2023-10-02"
+output: pdf_document
+header-includes:
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
+```
+
+##
+Set up train and test set
+Omit NAs
+Log transform and standardize features "Accept" and "Enroll"
+```{r}
+library(dplyr)
+# df name is College
+data(College,package="ISLR")
+College = na.omit(College)
+df = College %>%
+  select(Apps, Accept, Enroll) %>%
+  mutate(Accept = log(Accept),
+         Enroll = log(Enroll)) %>%
+  mutate(Accept = (Accept - mean(Accept)) / sd(Accept),
+         Enroll = (Enroll - mean(Enroll)) / sd(Enroll))
+
+df
+```
+
+```{r}
+sample = sample(c(TRUE, FALSE), size=nrow(df), replace=TRUE, prob=c(2/3,1/3))
+train = df[sample, ]
+test = df[!sample, ]
+
+X_train = data.frame(train$Accept, train$Enroll)
+colnames(X_train) = c("accept", "enroll")
+
+y_train = data.frame(train$Apps)
+colnames(y_train) = c("apps")
+
+X_test = data.frame(test$Accept, test$Enroll)
+colnames(X_test) = c("accept", "enroll")
+
+y_test = data.frame(test$Apps)
+colnames(y_test) = c("apps")
+
+```
+
+```{r}
+model = lm()
+```
+
