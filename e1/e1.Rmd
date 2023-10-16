@@ -21,12 +21,8 @@ library(dplyr)
 # df name is College
 data(College,package="ISLR")
 College = na.omit(College)
-df = College %>%
-  select(Apps, Accept, Enroll) %>%
-  mutate(Accept = log(Accept),
-         Enroll = log(Enroll)) %>%
-  mutate(Accept = (Accept - mean(Accept)) / sd(Accept),
-         Enroll = (Enroll - mean(Enroll)) / sd(Enroll))
+df = select(College, -Accept, -Enroll)
+# df = scale(df)
 
 df
 ```
@@ -35,22 +31,23 @@ df
 sample = sample(c(TRUE, FALSE), size=nrow(df), replace=TRUE, prob=c(2/3,1/3))
 train = df[sample, ]
 test = df[!sample, ]
-
-X_train = data.frame(train$Accept, train$Enroll)
-colnames(X_train) = c("accept", "enroll")
-
-y_train = data.frame(train$Apps)
-colnames(y_train) = c("apps")
-
-X_test = data.frame(test$Accept, test$Enroll)
-colnames(X_test) = c("accept", "enroll")
-
-y_test = data.frame(test$Apps)
-colnames(y_test) = c("apps")
+y_gt = test$Apps
+test = select(test, -Apps)
+test
+```
+### a
+```{r}
+res = lm(Apps ~., data=train)
+#summary(res)
+#plot(res)
+y_pred = predict(res, newdata=test)
+plot(pred[1:10])
+plot(test_y[1:10])
 
 ```
 
+### b
 ```{r}
-model = lm()
+model_mat = model.matrix(Apps ~., data=train)
 ```
 
