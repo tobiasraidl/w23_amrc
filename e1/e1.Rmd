@@ -135,7 +135,7 @@ anova(my_model, small_model)
 
 # 3.
 Both the RMSE aswell as the y vs. y hat plots are similar.
-```{r}
+```{r}s
 model_empty = lm(Apps ~ 1, data=train)
 model_backward = step(my_model, direction="backward", trace=0)
 model_forward = step(model_empty, scope=formula(lm.full), direction="forward", trace=0)
