@@ -38,7 +38,7 @@ y_test = test$Apps
 test = select(test, -Apps)
 ```
 ### 1.a
-The variables contributing to explaining the variable "Apps" the most are the ones with the highest absolute coefficient. In our case the top 3 are "F. Undergrad", "Expend" and "Private". Say we use an alpha of 0.05, all the variables with at least one asterisk to their name are perceived as statistically significant. The assumptions are not valid, because for high fitted values the variability is far lower than for small ones. Also the qq plot shows that the distribution is not normal and therefore this requirement is not fulfilled. The leverage plot shows possible outliars (outliars indicated by cooks distance > 1), we got none.
+The variables contributing to explaining the variable "Apps" the most are no necessarily the ones with the highest absolute coefficient. Say we use an alpha of 0.05, all the variables with at least one asterisk to their name are perceived as statistically significant. The assumptions are not valid, because for high fitted values the variability is far lower than for small ones. Also the qq plot shows that the distribution is not normal and therefore this requirement is not fulfilled. The leverage plot shows possible outliars (outliars indicated by cooks distance > 1), we got none. Preprocessing the observed variables in addition to the response variable could make these plots more meaningful.
 ```{r}
 my_model = lm(Apps ~., data=train)
 summary(my_model)
@@ -47,7 +47,7 @@ plot(my_model)
 ```
 
 ### 1.b
-I encoded the boolean variable "Private" to Yes=1 and No=0. Because I standardized all the variables in advance (besides private), the coefficients tell how much each variable describes the "Applications" variable. A high absolute coefficient in comparison to the other coefficients means that its corresponding variable has high explanatory power. "F. Undergrad" for example has a high coefficient, which implies that colleges with a high number in "F. Undergrad" would be estimated by this linear regression model to have a higher "Applications" number on average.
+I encoded the boolean variable "Private" to Yes=1 and No=0. Because I did only log transform the Apps variable, the coefficients do not necessarily tell how much each variable describes the "Apps" variable.
 ```{r}
 X = model.matrix(Apps ~., data=train)
 b = solve(t(X) %*% X) %*% t(X) %*% y_train
@@ -60,11 +60,11 @@ I chose to visualize the predicted values for train and test set by using a boxp
 y_hat_train = unlist(predict(my_model, select(train, -Apps)))
 diffs = abs(y_train-y_hat_train)
 par(mfrow = c(1, 2))
-boxplot(main="pred x gt differences (training set)", diffs, ylim=c(0,2))
+boxplot(main="pred x gt differences (training set)", diffs, ylim=c(0,0.3))
 
 y_hat_test = unlist(predict(my_model, test))
 diffs = abs(y_test-y_hat_test)
-boxplot(main="pred x gt differences (test set)", diffs, ylim=c(0,2))
+boxplot(main="pred x gt differences (test set)", diffs, ylim=c(0,0.3))
 ```
 
 # 1.d
@@ -87,7 +87,7 @@ cat(paste("Train RMSE: ", train_rmse, "\nTest RMSE: ", test_rmse))
 
 # 2.a
 Say alpha=0.05
-Now all variables are significant. It is not necessarily expected, because the test statistic is a new one too, meaning different p-values.
+Not all variables that were previously significant are the same now. Expend is is not significant. It is not necessarily expected, because the test statistic is a new one too, meaning different p-values.
 ```{r}
 small_train = select(train, c(Apps, Private,Top10perc, F.Undergrad, Outstate, Room.Board, perc.alumni, Expend, Grad.Rate))
 small_test = select(test, c(Private,Top10perc, F.Undergrad, Outstate, Room.Board, perc.alumni, Expend, Grad.Rate))
@@ -109,7 +109,7 @@ boxplot(main="pred x gt differences (test set)", diffs, ylim=c(0,0.4))
 ```
 
 # 2.c
-Again we evaluate for both the training and the test set, expecting the model to perform better on the train set. The errors are pretty similar to the ones of the model with all variables. The chosen variables seem to cover a huge amount of the explanatory power for Apps. Dimension reduction successful.
+Again we evaluate for both the training and the test set, expecting the model to perform better on the train set. The errors are pretty similar to the ones of the model with all variables. The chosen variables seem to cover a big amount of the explanatory power for Apps.
 ```{r}
 get_rmse = function(model, n, X, y) {
   y_hat = unlist(predict(model, X))
@@ -125,20 +125,19 @@ cat(paste("Train RMSE: ", train_rmse, "\nTest RMSE: ", test_rmse))
 ```
 
 # 2.d
-ANOVA for checking if the two samples. Say alpha=0.05, the p-value of 0.11 means that the difference of the models is not significant. Google says an F-value of over 2.5 would suggest to reject the null hypothesis. Ours is 1.69.
+ANOVA for checking if the two samples. The extremely low p-value means that the difference of the models is. Google says an F-value of over 2.5 would suggest to reject the null hypothesis. Ours i ~6.9.
 
 I think the abbreviations mean the following: RSS: sum of squared errors (between each model prediction and observed value), Sum of Sq: sum of squared differences between models
-My questions for oct 19th: What was the model evaluated on for receiving these metrics?
 ```{r}
 anova(my_model, small_model)
 ```
 
 # 3.
-Both the RMSE aswell as the y vs. y hat plots are similar.
-```{r}s
+Both the RMSE aswell as the y vs. y hat plots are similar even though they backward and forward step algorithm came not to the same conclusion of the "optimal" features.
+```{r}
 model_empty = lm(Apps ~ 1, data=train)
 model_backward = step(my_model, direction="backward", trace=0)
-model_forward = step(model_empty, scope=formula(lm.full), direction="forward", trace=0)
+model_forward = step(model_empty, scope=formula(my_model), direction="forward", trace=0)
 
 y_hat_backward = predict(model_backward, test)
 y_hat_forward = predict(model_forward, test)
@@ -147,7 +146,7 @@ cat(paste("backward model rmse: ", get_rmse(model_backward, nrow(test), test, y_
 cat(paste("\nforward model rmse: ", get_rmse(model_forward, nrow(test), test, y_test)))
 
 par(mfrow=c(1,2))
-plot(x=y_test, y=y_hat_backward, xlim=c(1,3), ylim=c(1.5,2.7))
-plot(x=y_test, y=y_hat_forward, xlim=c(1,3), ylim=c(1.5,2.7))
+plot(x=y_test, y=y_hat_backward)
+plot(x=y_test, y=y_hat_forward)
 
 ```
