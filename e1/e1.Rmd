@@ -12,10 +12,11 @@ header-includes:
 knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
 ```
 
-##
+### Preprocessing
 Set up train and test set
 Omit NAs
-Log transform and standardize features "Accept" and "Enroll"
+Log transform
+Remove variables "Accept" and "Enroll"
 ```{r}
 library(dplyr)
 # df name is College
@@ -23,9 +24,11 @@ data(College,package="ISLR")
 College = na.omit(College)
 df = select(College, -Accept, -Enroll)
 df$Private = ifelse(df$Private == "Yes", 1, 0)
-private = df$Private
-df = data.frame(scale(select(df,-Private)))
-df = cbind("Private"=private,df)
+apps = log(df$Apps)
+df$Apps = apps
+#df = data.frame(scale(select(df,-Private)))
+#df = cbind("Private"=private,df)
+df$Apps = log(df$Apps)
 set.seed(11717659)
 sample = sample(c(TRUE, FALSE), size=nrow(df), replace=TRUE, prob=c(2/3,1/3))
 train = df[sample, ]
@@ -35,7 +38,7 @@ y_test = test$Apps
 test = select(test, -Apps)
 ```
 ### 1.a
-The variables contributing to explaining the variable "Apps" the most are the ones with the highest absolute coefficient. In our case the top 3 are "F. Undergrad", "Expend" and "Private". Say we use an alpha of 0.05, all the variables with at least one asterisk to their name are perceived as statistically significant. Yes the assumptions of the diagnostics plots with `plot(res)` are valid.
+The variables contributing to explaining the variable "Apps" the most are the ones with the highest absolute coefficient. In our case the top 3 are "F. Undergrad", "Expend" and "Private". Say we use an alpha of 0.05, all the variables with at least one asterisk to their name are perceived as statistically significant. The assumptions are not valid, because for high fitted values the variability is far lower than for small ones. Also the qq plot shows that the distribution is not normal and therefore this requirement is not fulfilled. The leverage plot shows possible outliars (outliars indicated by cooks distance > 1), we got none.
 ```{r}
 my_model = lm(Apps ~., data=train)
 summary(my_model)
@@ -84,7 +87,7 @@ cat(paste("Train RMSE: ", train_rmse, "\nTest RMSE: ", test_rmse))
 
 # 2.a
 Say alpha=0.05
-Now all variables are significant. It is not necessarily expected, because the test statistik is a new one too, meaning different p-values.
+Now all variables are significant. It is not necessarily expected, because the test statistic is a new one too, meaning different p-values.
 ```{r}
 small_train = select(train, c(Apps, Private,Top10perc, F.Undergrad, Outstate, Room.Board, perc.alumni, Expend, Grad.Rate))
 small_test = select(test, c(Private,Top10perc, F.Undergrad, Outstate, Room.Board, perc.alumni, Expend, Grad.Rate))
@@ -98,11 +101,11 @@ plot(small_model)
 y_hat_small_train = unlist(predict(small_model, select(small_train, -Apps)))
 diffs = abs(y_train-y_hat_small_train)
 #par(mfrow = c(1, 2))
-boxplot(main="pred x gt differences (training set)", diffs, ylim=c(0,2))
+boxplot(main="pred x gt differences (training set)", diffs, ylim=c(0,0.4))
 
 y_hat_small_test = unlist(predict(small_model, small_test))
 diffs = abs(y_test-y_hat_small_test)
-boxplot(main="pred x gt differences (test set)", diffs, ylim=c(0,2))
+boxplot(main="pred x gt differences (test set)", diffs, ylim=c(0,0.4))
 ```
 
 # 2.c
@@ -133,8 +136,9 @@ anova(my_model, small_model)
 # 3.
 Both the RMSE aswell as the y vs. y hat plots are similar.
 ```{r}
+model_empty = lm(Apps ~ 1, data=train)
 model_backward = step(my_model, direction="backward", trace=0)
-model_forward = step(my_model, direction="forward", trace=0)
+model_forward = step(model_empty, scope=formula(lm.full), direction="forward", trace=0)
 
 y_hat_backward = predict(model_backward, test)
 y_hat_forward = predict(model_forward, test)
@@ -143,7 +147,7 @@ cat(paste("backward model rmse: ", get_rmse(model_backward, nrow(test), test, y_
 cat(paste("\nforward model rmse: ", get_rmse(model_forward, nrow(test), test, y_test)))
 
 par(mfrow=c(1,2))
-plot(x=y_test, y=y_hat_backward, xlim=c(-1,4), ylim=c(-1,4))
-plot(x=y_test, y=y_hat_forward, xlim=c(-1,4), ylim=c(-1,4))
+plot(x=y_test, y=y_hat_backward, xlim=c(1,3), ylim=c(1.5,2.7))
+plot(x=y_test, y=y_hat_forward, xlim=c(1,3), ylim=c(1.5,2.7))
 
 ```
