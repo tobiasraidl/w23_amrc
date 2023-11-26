@@ -15,8 +15,8 @@ knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
 Setup data
 ```{r}
 load("building.RData")
-set.seed(11717659)
 df
+set.seed(11717659)
 sample = sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(2/3,1/3))
 train = df[sample, ]
 test = df[!sample, ]
@@ -100,7 +100,7 @@ cat(paste("RMSE for test set:", get_rmse(res.test2$y, res.test2$y_pred)))
 ```
 
 # 2
-Nothin to do here
+Nothing to do here
 
 # 3
 ## (a)
@@ -108,7 +108,7 @@ Nothin to do here
 library(pls)
 set.seed(11717659)
 # train_idxs = which(sample)
-pcr_fit = pcr(y~., data=train, scale=TRUE, validation="CV", segments=10, segment.type="random")
+pcr_fit = pcr(y~., data=train, scale=TRUE, validation="CV", segments=10, ncomp=60, segment.type="random")
 summary(pcr_fit)
 ```
 
@@ -116,7 +116,6 @@ summary(pcr_fit)
 34 components seem to be optimal
 ```{r}
 validationplot(pcr_fit)
-predplot(pcr_fit)
 ```
 
 ## (c)
@@ -132,7 +131,7 @@ predplot(pcr_fit, newdata=test, ncomp=34, line=TRUE)
 # 4
 ## (a)
 ```{r}
-plsr_fit = plsr(y~., data=train, scale=TRUE, validation="CV", segments=10, segment.type="random")
+plsr_fit = plsr(y~., data=train, scale=TRUE, validation="CV", segments=10, ncomp=60, segment.type="random")
 summary(plsr_fit)
 ```
 
@@ -149,7 +148,7 @@ predplot(plsr_fit, ncomp=14, line=TRUE)
 
 ## (d)
 ```{r}
-predplot(plsr_fit, newdata=test, ncomp=34, line=TRUE)
+predplot(plsr_fit, newdata=test, ncomp=14, line=TRUE)
 ```
 
 ## (e)
