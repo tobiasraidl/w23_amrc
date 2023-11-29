@@ -44,25 +44,103 @@ Remove collinearity
 library(corrplot)
 num_train = train
 num_train$Status = as.integer(factor(num_train$Status))
-corrplot(cor(num_train))
+corrplot(cor(X_train))
 library(caret)
-indices_to_drop <- findCorrelation(cor(num_train), cutoff = 0.3)
-corrplot(cor(dplyr::select(num_train, -indices_to_drop)))
+indices_to_drop <- findCorrelation(cor(X_train), cutoff = 0.3, names=TRUE)
+corrplot(cor(dplyr::select(X_train, -indices_to_drop)))
 
-train = dplyr::select(num_train, -indices_to_drop)
-X_train = dplyr::select(num_train, -indices_to_drop)
+train = dplyr::select(train, -indices_to_drop)
+X_train = dplyr::select(X_train, -indices_to_drop)
 ```
 
 # 1
-## a
+## (a) Fit model with lda
+Yes I removed colinear variables and constant ones in the previous cell as data preprocessing.
 ```{r}
-lda = lda(Status~., X_train)
+lda = lda(Status~., train)
 summary(lda)
+```
+
+## (b) Evaluation on train set
+The lda predicts nearly all observations to be FP. This is probably due to the imbalance between FP to CO ratio in the data set.
+```{r}
 y_pred = predict(lda, X_train)$class
 conf_mat = table(y_train, y_pred)
-tp = conf_mat[1,1]
-tn = conf_mat[2,2]
-fp = conf_mat[1,2]
-fn = conf_mat[2,1]
-get_misclassification_rate(tp,fp,tn,fn)
+conf_mat
+get_misclassification_rate(conf_mat[1,1], conf_mat[2,1], conf_mat[2,2], conf_mat[1,2])
+```
+
+## (c) As expected, inference on the test set results in a higher misclassification rate and balanced accuracy. Not far off though.
+```{r}
+y_pred = predict(lda, X_test)$class
+conf_mat = table(y_test, y_pred)
+conf_mat
+get_misclassification_rate(conf_mat[1,1], conf_mat[2,1], conf_mat[2,2], conf_mat[1,2])
+```
+
+# 2
+## (a) Undersampling
+Undersample train set
+```{r}
+table(train$Status)
+class_counts = table(train$Status)
+majority_class = names(class_counts)[which.max(class_counts)]
+minority_class = names(class_counts)[which.min(class_counts)]
+minority_count = class_counts[minority_class]
+majority_indices = which(train$Status == majority_class)
+sampled_majority_indices = sample(majority_indices, minority_count)
+train_under = rbind(train[train$Status == minority_class], train[sampled_majority_indices])
+table(train_under$Status)
+X_train_under = dplyr::select(train_under, -Status)
+y_train_under = train_under$Status
+```
+
+Evaluate undersampling for train set
+~10% increase in balanced accuracy for train set.
+```{r}
+lda_under = lda(Status~., train_under)
+y_pred_under = predict(lda_under, X_train_under)$class
+conf_mat = table(y_train_under, y_pred_under)
+conf_mat
+get_misclassification_rate(conf_mat[1,1], conf_mat[2,1], conf_mat[2,2], conf_mat[1,2])
+```
+Evaluate undersampling for test set
+Performs a little worse than on the train set
+```{r}
+lda_under = lda(Status~., train_under)
+y_pred_under = predict(lda_under, X_test)$class
+conf_mat = table(y_test, y_pred_under)
+conf_mat
+get_misclassification_rate(conf_mat[1,1], conf_mat[2,1], conf_mat[2,2], conf_mat[1,2])
+```
+
+## (b) Oversampling
+```{r}
+class_counts = table(train$Status)
+majority_class = names(class_counts)[which.max(class_counts)]
+minority_class = names(class_counts)[which.min(class_counts)]
+majority_count = class_counts[majority_class]
+minority_indices = which(train$Status == minority_class)
+sampled_minority_indices = sample(minority_indices, majority_count, replace=TRUE)
+train_over = rbind(train[train$Status == majority_class], train[sampled_minority_indices])
+table(train_over$Status)
+X_train_over = dplyr::select(train_over, -Status)
+y_train_over = train_over$Status
+```
+Oversample train set
+```{r}
+lda_over = lda(Status~., train_over)
+y_pred_over = predict(lda_over, X_train_over)$class
+conf_mat = table(y_train_over, y_pred_over)
+conf_mat
+get_misclassification_rate(conf_mat[1,1], conf_mat[2,1], conf_mat[2,2], conf_mat[1,2])
+```
+
+Oversample test set
+```{r}
+lda_over = lda(Status~., train_over)
+y_pred_over = predict(lda_over, X_test)$class
+conf_mat = table(y_test, y_pred_over)
+conf_mat
+get_misclassification_rate(conf_mat[1,1], conf_mat[2,1], conf_mat[2,2], conf_mat[1,2])
 ```
