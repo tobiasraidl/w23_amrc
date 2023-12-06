@@ -1,0 +1,46 @@
+---
+title: "Exercise 6"
+author: "Tobias Raidl, 11717659"
+date: "2023-12-05"
+output:
+  pdf_document:
+    toc: true
+header-includes:
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
+```
+
+```{r}
+library(dplyr)
+library(mltools)
+library(data.table)
+
+bank = read.csv2("bank.csv")
+df = select(bank, -duration)
+
+df$job = as.factor(df$job)
+df$education = as.factor(df$education)
+df$marital = as.factor(df$marital)
+df$default = as.factor(df$default)
+df$housing = as.factor(df$housing)
+df$loan = as.factor(df$loan)
+df$contact = as.factor(df$contact)
+df$month = as.factor(df$month)
+df$poutcome = as.factor(df$poutcome)
+df$y = as.factor(df$y)
+
+df = one_hot(setDT(df), cols=c("job", "marital", "education", "contact", "month", "poutcome"))
+df
+
+t = df[sample(nrow(df), 3000), ]
+idxs = as.integer(rownames(t))
+
+train = df[idxs, ]
+test = df[-idxs, ]
+
+model = glm(y~., train, family="binomial")
+```
