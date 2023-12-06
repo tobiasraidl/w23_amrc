@@ -1,0 +1,102 @@
+---
+title: "Exercise 4"
+author: "Tobias Raidl, 11717659"
+date: "2023-11-21"
+output:
+  pdf_document:
+    toc: true
+header-includes:
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
+```
+
+# 1
+Is any data preprocessing necessary or advisable?
+Categorical variables EmpLen, Home and Status need to be numerically encoded. I use one-hot-encoding for EmpLen and Home and binary encoding for Status because it only contains 2 unique classes.
+```{r}
+mtrc_nr = 11717659
+library(ROCit)
+library(mltools)
+library(data.table)
+library(dplyr)
+
+df = Loan
+df = one_hot(as.data.table(df), cols=c("EmpLen", "Home"))
+df$Status = ifelse(df$Status == "CO", 1, 0)
+df = select(df, -c(Term, EmpLen_U, Home_RENT, Score))
+
+set.seed(mtrc_nr)
+sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(2/3,1/3))
+train  <- df[sample, ]
+test   <- df[!sample, ]
+
+model = lm(Status~., train)
+```
+
+# 2
+What do you conclude when inspecting the outcome of summary()?
+Some coefficients are NA. I suspect the cause of this being some variables being linearly related to others. (multicollinearity)
+```{r}
+str(df)
+summary(model)
+```
+
+# 3
+Shall we be worried looking at plot()?
+No because this is not a regression task.
+```{r}
+plot(model)
+```
+
+# 4
+Which cutoff value would be useful in order to obtain reasonable class predictions?
+None as my model sucks, but i guess like 0.2 or somethihng like that.
+```{r}
+pred = predict(model, train, type="response")
+plot(x=train$Status, y=pred)
+class.pred = as.numeric(pred>0.2)
+```
+
+# 5
+Which conclusions can you draw from these numbers?
+The model either sucks or i made a major mistake. With a cutoff value of 0.2 we receive an accuracy of 0.71
+```{r}
+t = table(train$Status, class.pred)
+t
+accuracy = (t[1,1]+t[2,2])/sum(t)
+paste("accuracy:", accuracy)
+```
+
+# 6
+Which value would indicate the quality of your classifier? Is the classifier doing a good job?
+The AUC indicates the quality of our classifier. 1 would be ideal 0.5 would be the same as random picking. We receive an AUC of 0.6. This is visualized by the plot where the AUC is depicted as the area under the curve.
+```{r}
+roc = rocit(class.pred, train$Status)
+summary(roc)
+plot(roc)
+```
+
+# 7
+```{r}
+meas = measureit(class.pred, train$Status, measure=c("TPR", "TNR"))
+meas
+plot(meas$TNR, meas$TPR)
+
+cutoff.optim = 0.285
+```
+
+# 8
+What are your final conclusions?
+We now get an accuracy of 0.82 which is an improvement of 10% using this optimal cutoff point instead of the informally estimated one.
+```{r}
+pred = predict(model, test, type="response")
+class.pred.optim = as.numeric(pred>cutoff.optim)
+t = table(class.pred.optim, test$Status)
+t
+accuracy = (t[1,1]+t[2,2])/sum(t)
+paste("accuracy:", accuracy)
+```
