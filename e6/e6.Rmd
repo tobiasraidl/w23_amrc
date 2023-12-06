@@ -10,10 +10,11 @@ header-includes:
   \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
 ---
 
-```{r setup, include=FALSE}
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
 ```
 
+### Preprocessing
 ```{r}
 library(dplyr)
 library(mltools)
@@ -22,25 +23,164 @@ library(data.table)
 bank = read.csv2("bank.csv")
 df = select(bank, -duration)
 
+# one-hot encode multiclass variables
 df$job = as.factor(df$job)
-df$education = as.factor(df$education)
 df$marital = as.factor(df$marital)
-df$default = as.factor(df$default)
-df$housing = as.factor(df$housing)
-df$loan = as.factor(df$loan)
+df$education = as.factor(df$education)
+
 df$contact = as.factor(df$contact)
 df$month = as.factor(df$month)
 df$poutcome = as.factor(df$poutcome)
-df$y = as.factor(df$y)
 
 df = one_hot(setDT(df), cols=c("job", "marital", "education", "contact", "month", "poutcome"))
-df
+
+# label encode binary variables
+df$default = as.numeric(factor(df$default))-1
+df$housing = as.numeric(factor(df$housing))-1
+df$loan = as.numeric(factor(df$loan))-1
+df$y = as.numeric(factor(df$y))-1
 
 t = df[sample(nrow(df), 3000), ]
 idxs = as.integer(rownames(t))
 
 train = df[idxs, ]
 test = df[-idxs, ]
+```
 
-model = glm(y~., train, family="binomial")
+# 1.
+## a
+Select randomly a training set with 3000 observations, and use logistic regression (function glm() with family="binomial"). Look at the inference table (with summary()) and interpret the outcome.
+
+It seems that poutcome and contact are the most relevant variables for the description of y.
+```{r}
+model = glm(y~., train, family=binomial)
+# summary(model)
+```
+
+## b
+Use the model to predict the group label of the remaining test set observations (what does the function actually predict by default?). Compute the missclassification rate for every group separately.
+
+By default, the predictions are returned in the scale of the linear predictor, and thus zero is the decision boundary. One could also get predictions in the scale of the response variable (with type="response").
+```{r}
+y_pred_reg = predict(model, select(test, -y), type="response")
+plot(y_pred_reg, test$y)
+
+cutoff = 0.5
+y_pred = as.numeric(y_pred_reg>cutoff)
+t = table(pred=y_pred, gt=test$y)
+t
+
+cat(paste("Misclassification rate for no:", t[2,1]/sum(t[,1]), "\nMisclassification rate for yes:", t[1,2]/sum(t[,2])))
+```
+
+## c
+Since the data set is heavily imbalanced, i.e. we have many more “no” clients,
+we might have a problem with high misclassifications for the “yes” clients,
+which are in fact the interesting ones, since the bank does not want to lose
+potential customers. A way to consider this problem is to assign a weight to
+every observation, by using the weights argument in the glm() function. How
+do you have to select the weights, and what are the resulting misclassification
+rates?
+
+Observations of class "no" are given the relative amount of "no"s in the entire training set. For "yes" it is the other way around. In our case there are way more "no" observations, therefore they will have a rather low weight.
+```{r}
+count_no = length(which(train$y == 0))
+count_yes = length(which(train$y == 1))
+weight_no = count_yes/nrow(train)
+weight_yes = count_no/nrow(train)
+
+weights = sapply(train$y, function(x) ifelse(x, weight_yes, weight_no))
+
+model = glm(y~., train, family=binomial, weights=weights)
+# summary(model)
+
+y_pred_reg = predict(model, select(test, -y), type="response")
+plot(y_pred_reg, test$y)
+
+cutoff = 0.5
+y_pred = as.numeric(y_pred_reg>cutoff)
+t = table(pred=y_pred, gt=test$y)
+t
+
+cat(paste("Misclassification rate for no:", t[2,1]/sum(t[,1]), "\nMisclassification rate for yes:", t[1,2]/sum(t[,2])))
+```
+
+## d
+Based on the model from 1(c), use stepwise variable selection with the function
+step() to simplify the model. Does this also lead to an improvement of the
+misclassification rates?
+
+This dim reduction increases the "yes" misclassification rate, but decreases the "no" misclassification rate slightly.
+```{r, warning=FALSE}
+s = step(model, trace=0)
+s$formula
+
+model = glm(s$formula, train, family=binomial, weights=weights)
+# summary(model)
+
+y_pred_reg = predict(model, select(test, -y), type="response")
+plot(y_pred_reg, test$y)
+
+cutoff = 0.5
+y_pred = as.numeric(y_pred_reg>cutoff)
+t = table(pred=y_pred, gt=test$y)
+t
+
+cat(paste("Misclassification rate for no:", t[2,1]/sum(t[,1]), "\nMisclassification rate for yes:", t[1,2]/sum(t[,2])))
+```
+# 2
+## b
+Use the function cv.glmnet() from the package glmnet, with the argument
+family="multinomial", to build a model for the training set (the response
+might need to be converted to a factor). Plot the outcome object. What do
+you conclude? What is the objective function to be minimized?
+
+Ask in lecture: How to interpret this plot?
+```{r}
+library(ISLR)
+library(glmnet)
+
+data(Khan)
+data = Khan
+data$ytrain = factor(data$ytrain)
+data$ytest = factor(data$ytest)
+
+model = cv.glmnet(x=data$xtrain, y=data$ytrain, family="multinomial")
+plot(model)
+```
+## c
+ Which variables contribute to the model? To see this, you can use coef()
+for the output object. You obtain an object with 4 (= number of groups)
+list elements, containing the estimated regression coefficients. Thus, this is
+different from our approach to logistic regression with K groups in the course
+notes, where you would only obtain K-1 coefficient vectors.
+
+I think the variables with coefficients are relevant. The higher the absolute coefficient the more relevant. In our case e.g.: V1 or V123
+Ask in lecture: How to display this in a readable manner?
+```{r}
+c = coef(model)
+```
+
+## d
+Select one of the variables from 2(c) which is relevant e.g. for the first group,
+and plot this variable against the response (using the training data). What you
+should see is that the values of the first group clearly differ from those of the
+other groups.
+```{r}
+plot(data$ytrain, data$xtrain[, 123])
+plot(data$ytrain, data$xtrain[, 123])
+```
+
+Now use the trained model and predict the group membership of the test data.
+Be careful, predict() yields predictions for each observation to each class, and
+you need to select the appropriate class. Report the confusion table and the
+misclassification error for the test data.
+```{r}
+y_pred_prob = predict(model, data$xtest, type="response")
+y_pred = colnames(y_pred_prob)[apply(y_pred_prob,1,which.max)]
+
+t = table(pred=y_pred, gt=data$ytest)
+t
+
+cat(paste("Misclassification rate for no:", t[2,1]/sum(t[,1]), "\nMisclassification rate for yes:", t[1,2]/sum(t[,2])))
 ```
