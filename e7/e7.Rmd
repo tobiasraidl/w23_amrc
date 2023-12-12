@@ -1,0 +1,85 @@
+---
+title: "Exercise 7"
+author: "Tobias Raidl, 11717659"
+date: "2023-12-12"
+output:
+  pdf_document:
+    toc: true
+header-includes:
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
+```
+
+```{r}
+library(gclus)
+data(ozone)
+
+sample <- sample(c(TRUE, FALSE), nrow(ozone), replace=TRUE, prob=c(0.7,0.3))
+train  <- ozone[sample, ]
+test   <- ozone[!sample, ]
+```
+
+```{r}
+lecturespl<-function(x,nknots=2,M=4){
+  # nknots ... number of knots- > placed at regular quantiles
+  # M ... M-1 is the degree of the polynomial
+  n <- length(x)
+  # X will not get an intercept column
+  X<-matrix(NA, nrow=n, ncol=(M-1) + nknots)
+  for(i in 1:(M-1)){
+    X[,i]<-x^i
+  }
+  # now the basis functions for the constraints:
+  quant<-seq(0,1,1/(nknots+1))[c(2:(nknots+1))]
+  qu<-quantile(x,quant)
+  for(i in M:(M + nknots-1)){
+    X[,i]<-ifelse(x-qu[i-M+1]<0,0,(x-qu[i-M+1])^(M-1))
+  }
+  list(X=X,quantiles=quant,xquantiles=qu)
+}
+```
+
+## 1
+```{r}
+plotspl <- function(splobj, ...){
+  matplot(train$Temp, splobj$X,type="l",lty=1,
+  xlab="x",ylab="h(x)", ...)
+  abline(v=splobj$xquantiles,lty=3,col=gray(0.5))
+}
+
+spl = lecturespl(train$Temp)
+plotspl(spl)
+
+```
+
+## 2
+```{r}
+model = lm(train$Ozone~spl$X)
+
+plot(ozone$Temp, ozone$Ozone)
+lines(train$Temp, predict(model, newdata=data.frame(train$Temp)), col="blue")
+```
+
+## 3
+```{r}
+library(ggplot2)
+plot(ozone$Temp, ozone$Ozone)
+lines(train$Temp,predict(model, newdata=data.frame(train$Temp)), col="blue")
+length(predict(model, newdata=data.frame(test$Temp)))
+
+ggplot(data=ozone, aes(x=Temp, y=Ozone, col=sample)) +
+  geom_point()
+
+ggplot() +
+  geom_point(data=train, aes(x=Temp, y=Ozone), col="brown") +
+  geom_point(data=test, aes(x=Temp, y=Ozone), col="steelblue") +
+  geom_line(data=train, aes(x=Temp, y=predict(model, newdata=data.frame(train$Temp))), col="brown") +
+  geom_line(aes(x=test$Temp, y=predict(model, newdata=data.frame(test$Temp))), col="steelblue")
+```
+
+
+
