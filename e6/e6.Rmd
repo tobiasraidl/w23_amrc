@@ -54,7 +54,7 @@ Select randomly a training set with 3000 observations, and use logistic regressi
 It seems that poutcome and contact are the most relevant variables for the description of y.
 ```{r}
 model = glm(y~., train, family=binomial)
-# summary(model)
+summary(model)
 ```
 
 ## b
