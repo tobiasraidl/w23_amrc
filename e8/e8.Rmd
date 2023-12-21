@@ -1,0 +1,96 @@
+---
+title: "Exercise 8"
+author: "Tobias Raidl, 11717659"
+date: "2023-12-18"
+output: pdf_document
+header-includes:
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
+```
+
+```{r}
+library(dplyr)
+library(ISLR)
+library(splines)
+data(Auto)
+
+df = select(Auto, -name)
+df_trans = df
+df_trans[,1] = log(df[,1])
+df_trans[,3] = log(df[,3])
+df_trans[,4] = log(df[,4])
+df_trans[,5] = log(df[,5])
+
+
+
+set.seed(11717659)
+sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(0.7,0.3))
+train  <- df[sample, ]
+test   <- df[!sample, ]
+```
+
+## Initial
+```{r}
+library(ggplot2)
+library(tidyr)
+for (i in 1:ncol(df)) {
+  par(mfrow = c(1, 2))
+  hist(df[,i], main=colnames(df)[i])
+  plot(df[,i], df$mpg, main=colnames(df)[i])
+}
+```
+
+## Transformed
+```{r}
+library(ggplot2)
+library(tidyr)
+for (i in 1:ncol(df_trans)) {
+  par(mfrow = c(1, 2))
+  hist(df_trans[,i], main=colnames(df_trans)[i])
+  plot(df_trans[,i], df_trans$mpg, main=colnames(df_trans)[i])
+}
+```
+
+## RMSE function
+```{r}
+get_rmse = function(y_pred, y_gt) {
+  return(sqrt(mean((y_pred-y_gt)^2)))
+}
+```
+
+## 1
+Cylinders, year and origins should be treated as factors.
+Using log transformation all variables could be represented linearly.
+Not using log transform displacement, horsepower, weight, cylinders and year should be represented by splines.
+
+## 2 & 3
+```{r}
+degfree=2
+lin_model = lm(mpg~., data=train)
+spl_model = lm(mpg~(
+  ns(displacement, df=degfree) +
+  ns(horsepower, df=degfree) +
+  ns(weight, df=degfree) +
+  ns(cylinders, df=degfree) +
+  ns(year, df=degfree)), data=train)
+summary(spl_model)
+
+
+```
+## 5 & 6
+```{r}
+y_pred_lin = predict(lin_model, test)
+y_pred_spl = predict(spl_model, test)
+get_rmse(y_pred_lin, test$mpg)
+get_rmse(y_pred_spl, test$mpg)
+
+preds = data.frame(lin=y_pred_lin, spl=y_pred_spl, gt=test$mpg)
+ggplot() +
+  geom_point(data=preds, aes(gt, lin), col="red") +
+  geom_point(data=preds, aes(gt, spl), col="steelblue") +
+  geom_abline(intercept=0, slope=1)
+```
