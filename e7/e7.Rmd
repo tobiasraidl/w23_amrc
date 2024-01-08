@@ -21,6 +21,9 @@ data(ozone)
 sample <- sample(c(TRUE, FALSE), nrow(ozone), replace=TRUE, prob=c(0.7,0.3))
 train  <- ozone[sample, ]
 test   <- ozone[!sample, ]
+
+train <- train[order(train$Temp),]
+test <- test[order(test$Temp),]
 ```
 
 ```{r}
@@ -39,14 +42,14 @@ lecturespl<-function(x,nknots=2,M=4){
   for(i in M:(M + nknots-1)){
     X[,i]<-ifelse(x-qu[i-M+1]<0,0,(x-qu[i-M+1])^(M-1))
   }
-  list(X=X,quantiles=quant,xquantiles=qu)
+  list(X=X,quantiles=quant,xquantiles=qu, x=x)
 }
 ```
 
 ## 1
 ```{r}
 plotspl <- function(splobj, ...){
-  matplot(train$Temp, splobj$X,type="l",lty=1,
+  matplot(splobj$x, splobj$X,type="l",lty=1,
   xlab="x",ylab="h(x)", ...)
   abline(v=splobj$xquantiles,lty=3,col=gray(0.5))
 }

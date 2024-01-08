@@ -76,6 +76,7 @@ spl_model = lm(mpg~(
   ns(horsepower, df=degfree) +
   ns(weight, df=degfree) +
   ns(cylinders, df=degfree) +
+  ns(acceleration, df=degfree) +
   ns(year, df=degfree)), data=train)
 summary(spl_model)
 
