@@ -1,0 +1,109 @@
+---
+title: "Exercise 9"
+author: "Tobias Raidl, 11717659"
+date: "2023-01-15"
+output:
+  pdf_document:
+    toc: true
+header-includes:
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
+```
+
+### 
+```{r}
+library(ROCit)
+
+data(Loan)
+
+df = Loan
+set.seed(11717659)
+sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(0.7,0.3))
+train  <- df[sample, ]
+test   <- df[!sample, ]
+```
+
+# a)
+Compute an initial tree $T0$ (see help(rpart) or lecture notes).
+```{r}
+library(rpart)
+t0 = rpart(Status~., data=train, method="class",cp=0.001,xval=20)
+par(mfrow = c(1,2), xpd = NA)
+```
+
+# b)
+Visualize the tree with the function plot() and text(), and interpret the
+results.
+```{r}
+plot(t0)
+text(t0, use.n=TRUE)
+```
+
+# c)
+Predict the class variable for the test set (see help(predict.rpart) or lecture
+notes). Show the confusion table and report the balanced accuracy.
+```{r}
+get_balanced_accuracy = function(gt, pred) {
+  # (sensitivity/specificity) / 2
+  conv_mat = table(gt, pred)
+  print(conv_mat)
+  fn = conv_mat[2,1]
+  fp = conv_mat[1,2]
+  tp = conv_mat[1,1]
+  tn = conv_mat[2,2]
+  sensitivity = tp/(tp+fn)
+  specificity = tn/(tn+fp)
+  return(0.5*(sensitivity+specificity))
+}
+
+t0.pred = predict(t0, test, type="class")
+cat(paste("balanced accuracy:", get_balanced_accuracy(test$Status, t0.pred)))
+```
+
+# d)
+Show and interpret results of cross-validation obtained by using printcp()
+und plotcp(). What is the optimal tree complexity?
+```{r}
+printcp(t0)
+plotcp(t0, upper="size")
+```
+The optimal tree complexity is 0.0003
+
+# e)
+Prune the tree $T_0$ to the optimal complexity using prune(). Visualize und
+interpret the results.
+```{r}
+t1 = prune(t0, cp=0.003)
+par(mfrow = c(1,2), xpd = NA)
+plot(t1)
+text(t1)
+```
+
+# f)
+Predict the class variable for the test set, show the confusion table, and report
+the balanced accuracy. Do we observe any improvement?
+```{r}
+t1.pred = predict(t1, test, type="class")
+cat(paste("balanced accuracy:", get_balanced_accuracy(test$Status, t1.pred)))
+```
+We can observe an improvement in balanced accuracy by  ~5%
+
+# g)
+ A simple way to improve the balanced accuracy could be to make use of the
+argument weights within rpart(). Try it out and report the results.
+# TODO: weight machen noch keine difference
+```{r}
+CO_weight = 1.0 / (nrow(subset(train, Status == "CO")) / nrow(train))
+FP_weight = 1.0 / (nrow(subset(train, Status != "CO")) / nrow(train))
+
+weights <- ifelse(train$Status== TRUE, CO_weight, FP_weight)
+
+t3 = rpart(Status~., data=train, method="class",cp=0.003,xval=20, weights=weights)
+t3.pred = predict(t3, test, type="class")
+cat(paste("balanced accuracy:", get_balanced_accuracy(test$Status, t3.pred)))
+```
+
