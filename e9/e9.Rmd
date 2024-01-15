@@ -1,0 +1,108 @@
+---
+title: "Exercise 9"
+author: "Tobias Raidl, 11717659"
+date: "2023-01-06"
+output: pdf_document
+header-includes:
+  \usepackage{fvextra}
+  \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, tidy=TRUE)
+```
+
+
+Load the data Diabetes from the package ROCit. Delete observations with missings using
+na.omit(). Our goal is to find a classification model for diabetes, based on the variable dtest
+– see help file. For this task we shall use Generalized Additive Models, implemented in the
+function gam() of the package library(mgcv), using the argument family="binomial".
+Select randomly a training set of about 2/3 of the observations, build the classification model, predict the group membership for the (remaining) test data and compute the
+misclassification rate.
+```{r}
+library(ROCit)
+library(mgcv)
+library(dplyr)
+library(mltools)
+library(data.table)
+
+data(Diabetes)
+df = na.omit(Diabetes)
+df = df %>%
+  select(-c(id, glyhb)) #%>%
+  #mutate(dtest=if_else(dtest=="+", TRUE, FALSE))
+
+#df = one_hot(as.data.table(df))
+
+set.seed(123)
+sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(2/3,1/3))
+train  <- df[sample, ]
+test   <- df[!sample, ]
+```
+
+### a)
+Which of the remaining variables should be considered in the model? Argue why it
+could make sense to exclude predictor variables
+
+exclude id because there is no relation between it and dtest
+exclude glyhb because dtest (our response variable) indicates glyhb
+exclude ratio because its just the chol/hdl ratio -> already got those
+exclude bmi because its purely based on height and weight -> already got those
+exclude whr because its just the waist/hip ratio -> already got those
+
+
+
+
+### b)
+The smooth functions in GAMs can be defined for every variable by s(variable), see
+also course notes. It might not make sense to use smooth functions for all variables, for
+sure not for factor variables. Now compute the GAM based on your chosen “formula”.
+### c)
+You might experience difficulties with estimating too many parameters. This could be
+solved by using the parameter k within s(), which allows to set an upper bound for
+the effective degrees of freedom.
+```{r}
+model.gam = gam(as.factor(dtest) ~ s(chol, k=3) + s(hdl, k=3) + s(age, k=3) + s(bmi, k=3) + 
+               s(bp.1s, k=3) + s(bp.1d, k=3) + s(waist, k=3) + s(hip, k=3) + 
+               s(time.ppn, k=3) + s(whr, k=3) + gender + frame, family="binomial", data=train)
+
+summary(model.gam)
+```
+
+### d)
+Which variables are significant in the model? How complex are the smooth functions?
+
+
+### e)
+Plot the explanatory variables against their smoothed values as they are used in the
+model. You can simply use: plot(gam.object,page=1,shade=TRUE,shade.col="yellow")
+How can you interpret these plots?
+```{r}
+library(ggplot2)
+ggplot(data=train, aes(x=chol, y=))
+```
+
+### f)
+Report the misclassification error for the test set.
+```{r}
+
+```
+
+### g)
+We can try to improve the classifier by variable selection. A natural option would be
+stepwise variable selection. A look into the help file of step.gam says that There is
+no step.gam in package mgcv. Nice. However, you can find some hints to still improve
+the model. Try out one of these ideas. Which variables are not used in the model?
+Compare with the misclassification error from (f).
+```{r}
+
+```
+
+### h)
+ Fit again a GAM, but only with the explanatory variables selected in (g). Inspect and
+interpret the outputs of summary() and plot(), and report the misclassification error
+for the test set.
+```{r}
+
+```
+
