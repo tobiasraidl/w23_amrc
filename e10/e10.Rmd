@@ -25,9 +25,10 @@ set.seed(11717659)
 sample <- sample(c(TRUE, FALSE), nrow(df), replace=TRUE, prob=c(0.7,0.3))
 train  <- df[sample, ]
 test   <- df[!sample, ]
+summary(train$Status)
 ```
 
-# a)
+## a)
 Compute an initial tree $T0$ (see help(rpart) or lecture notes).
 ```{r}
 library(rpart)
@@ -35,7 +36,7 @@ t0 = rpart(Status~., data=train, method="class",cp=0.001,xval=20)
 par(mfrow = c(1,2), xpd = NA)
 ```
 
-# b)
+## b)
 Visualize the tree with the function plot() and text(), and interpret the
 results.
 ```{r}
@@ -43,28 +44,27 @@ plot(t0)
 text(t0, use.n=TRUE)
 ```
 
-# c)
+## c)
 Predict the class variable for the test set (see help(predict.rpart) or lecture
 notes). Show the confusion table and report the balanced accuracy.
 ```{r}
 get_balanced_accuracy = function(gt, pred) {
   # (sensitivity/specificity) / 2
-  conv_mat = table(gt, pred)
-  print(conv_mat)
-  fn = conv_mat[2,1]
-  fp = conv_mat[1,2]
-  tp = conv_mat[1,1]
-  tn = conv_mat[2,2]
+  conf_mat = table(gt, pred)
+  fn = conf_mat[2,1]
+  fp = conf_mat[1,2]
+  tp = conf_mat[1,1]
+  tn = conf_mat[2,2]
   sensitivity = tp/(tp+fn)
   specificity = tn/(tn+fp)
-  return(0.5*(sensitivity+specificity))
+  return(list(val=0.5*(sensitivity+specificity), conf_mat=conf_mat))
 }
 
 t0.pred = predict(t0, test, type="class")
 cat(paste("balanced accuracy:", get_balanced_accuracy(test$Status, t0.pred)))
 ```
 
-# d)
+## d)
 Show and interpret results of cross-validation obtained by using printcp()
 und plotcp(). What is the optimal tree complexity?
 ```{r}
@@ -73,7 +73,7 @@ plotcp(t0, upper="size")
 ```
 The optimal tree complexity is 0.0003
 
-# e)
+## e)
 Prune the tree $T_0$ to the optimal complexity using prune(). Visualize und
 interpret the results.
 ```{r}
@@ -83,27 +83,87 @@ plot(t1)
 text(t1)
 ```
 
-# f)
+## f)
 Predict the class variable for the test set, show the confusion table, and report
 the balanced accuracy. Do we observe any improvement?
 ```{r}
 t1.pred = predict(t1, test, type="class")
-cat(paste("balanced accuracy:", get_balanced_accuracy(test$Status, t1.pred)))
+bal_acc = get_balanced_accuracy(test$Status, t1.pred)
+bal_acc$conf_mat
+cat(paste("balanced accuracy:", bal_acc$val))
 ```
 We can observe an improvement in balanced accuracy by  ~5%
 
-# g)
+## g)
  A simple way to improve the balanced accuracy could be to make use of the
 argument weights within rpart(). Try it out and report the results.
-# TODO: weight machen noch keine difference
 ```{r}
-CO_weight = 1.0 / (nrow(subset(train, Status == "CO")) / nrow(train))
-FP_weight = 1.0 / (nrow(subset(train, Status != "CO")) / nrow(train))
+CO_weight = 1.0 / nrow(subset(train, Status == "CO")) / nrow(train)
+FP_weight = 1.0 / nrow(subset(train, Status == "FP")) / nrow(train)
 
-weights <- ifelse(train$Status== TRUE, CO_weight, FP_weight)
+weights <- ifelse(train$Status=="CO", CO_weight, FP_weight)
 
 t3 = rpart(Status~., data=train, method="class",cp=0.003,xval=20, weights=weights)
 t3.pred = predict(t3, test, type="class")
-cat(paste("balanced accuracy:", get_balanced_accuracy(test$Status, t3.pred)))
+bal_acc = get_balanced_accuracy(test$Status, t3.pred)
+bal_acc$conf_mat
+cat(paste("balanced accuracy:", bal_acc$val))
 ```
+Results are worse.
+
+# 2
+## a)
+Use Random Forests to classify the training data and predict the class variable
+for the test data. Report the resulting cofusion table and the balanced accuracy.
+```{r}
+library(randomForest)
+set.seed(11717659)
+rf0 = randomForest(Status~., data=train)
+rf0.pred = predict(rf0, test)
+bal_acc = get_balanced_accuracy(test$Status, rf0.pred)
+bal_acc$conf_mat
+cat(paste("balanced accuracy:", bal_acc$val))
+```
+
+## b)
+ Plot the result object with plot() and interpret the plot
+```{r}
+plot(rf0)
+```
+Plot the error rates or MSE of a randomForest object. I think the red line corresponds to the error for class CO and the green line to the error of FP, for the different number of trees.
+
+## c)
+Try to improve the balanced accuracy with different strategies:
+– Modify the parameter sampsize in the randomForest() function. What is it doing?
+– Modify the parameter classwt in the randomForest() function. What is it doing?
+– Modify the parameter cutoff in the randomForest() function. What is it doing?
+Which approach leads to the overall best solution?
+
+```{r}
+set.seed(11717659)
+
+CO.count = floor(sum(train$Status == "CO")/10)
+FP.count = floor(sum(train$Status == "FP")/10)
+sampsize_grid.errors = matrix(NA, nrow=CO.count, ncol=FP.count)
+for(i in seq(1, CO.count)) {
+  for (j in seq(1, FP.count)) {
+    rf = randomForest(Status~., data=train, sampsize=c(i*10, j*10))
+    rf.pred = predict(rf, newdata=test)
+    sampsize_grid.errors[i, j] = get_balanced_accuracy(test$Status, rf.pred)$val
+  }
+}
+sampsize_grid.errors
+```
+
+```{r}
+rf1 = randomForest(Status~., data=train, sampsize=c(90, 440))
+rf1.pred = predict(rf1, test)
+bal_acc = get_balanced_accuracy(test$Status, rf1.pred)
+bal_acc$conf_mat
+cat(paste("balanced accuracy:", bal_acc$val))
+```
+
+- sampsize: Sizes of sample to draw. Parameter takes vector where each value corresponds to the numbers drawn per class. (Stratification)
+- classwt: Priors of the classes.
+- cutoff: A vector of length equal to number of classes. The ‘winning’ class for an observation is the one with the maximum ratio of proportion of votes to cutoff. Default is 1/k where k is the number of classes (i.e., majority vote wins).
 
