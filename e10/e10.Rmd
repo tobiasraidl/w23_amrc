@@ -130,7 +130,7 @@ cat(paste("balanced accuracy:", bal_acc$val))
 ```{r}
 plot(rf0)
 ```
-Plot the error rates or MSE of a randomForest object. I think the red line corresponds to the error for class CO and the green line to the error of FP, for the different number of trees.
+Plot the error rates of the randomForest I think the red line corresponds to the error for class CO and the green line to the error of FP, for the different number of trees.
 
 ## c)
 Try to improve the balanced accuracy with different strategies:
@@ -138,32 +138,24 @@ Try to improve the balanced accuracy with different strategies:
 – Modify the parameter classwt in the randomForest() function. What is it doing?
 – Modify the parameter cutoff in the randomForest() function. What is it doing?
 Which approach leads to the overall best solution?
-
 ```{r}
 set.seed(11717659)
-
-CO.count = floor(sum(train$Status == "CO")/10)
-FP.count = floor(sum(train$Status == "FP")/10)
-sampsize_grid.errors = matrix(NA, nrow=CO.count, ncol=FP.count)
-for(i in seq(1, CO.count)) {
-  for (j in seq(1, FP.count)) {
-    rf = randomForest(Status~., data=train, sampsize=c(i*10, j*10))
-    rf.pred = predict(rf, newdata=test)
-    sampsize_grid.errors[i, j] = get_balanced_accuracy(test$Status, rf.pred)$val
-  }
-}
-sampsize_grid.errors
-```
-
-```{r}
-rf1 = randomForest(Status~., data=train, sampsize=c(90, 440))
+rf1 = randomForest(Status~., data=train, sampsize=c(50, 10), classwt=c(0.1, 0.5), cutoff=c(0.6, 0.4), importance=TRUE)
 rf1.pred = predict(rf1, test)
 bal_acc = get_balanced_accuracy(test$Status, rf1.pred)
 bal_acc$conf_mat
 cat(paste("balanced accuracy:", bal_acc$val))
+plot(rf1)
+varImpPlot(rf1)
 ```
 
 - sampsize: Sizes of sample to draw. Parameter takes vector where each value corresponds to the numbers drawn per class. (Stratification)
 - classwt: Priors of the classes.
 - cutoff: A vector of length equal to number of classes. The ‘winning’ class for an observation is the one with the maximum ratio of proportion of votes to cutoff. Default is 1/k where k is the number of classes (i.e., majority vote wins).
 
+I tried multiple combinations for the sampsize and [50, 10] had the best balanced accuracy. This parameter seems to be rather sensitive, as minor changes can change the balanced accuracy massively.
+The cutoff [0.6, 0.4] results in the best balanced accuracy.
+For classwt the priors for each class should be chosen and are per default 1/2 for us due to 2 classes. I changed it to [0.1, 0.5] because we have ~100 appearances of class CO and ~500 appearances of class FP.
+
+Plot the error rates of the random forest. I think the red line corresponds to the error for class CO and the green line to the error of FP, for the different number of trees.
+The varImpPlot displays the importance of the variables.
